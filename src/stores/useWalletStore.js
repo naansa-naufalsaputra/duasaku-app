@@ -143,7 +143,7 @@ const useWalletStore = create((set, get) => ({
 
     subscribeWallets: (ledgerId) => {
         get().unsubscribeWallets?.()
-        const q = query(collection(db, 'wallets'), where('ledgerId', '==', ledgerId))
+        const q = query(collection(db, 'wallets'), where('uid', '==', get().user?.uid))
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const wallets = []
@@ -191,11 +191,11 @@ const useWalletStore = create((set, get) => ({
     subscribeTransactions: (ledgerId) => {
         get().unsubscribeTransactions?.()
 
-        // Query by ledgerId (and exclude Subscription Templates)
+        // Query by UID (Strict Isolation)
         const q = query(
             collection(db, 'transactions'),
-            where('ledgerId', '==', ledgerId),
-            where('type', '!=', 'SUBSCRIPTION_MASTER') // Ensure no templates leak
+            where('uid', '==', get().user?.uid),
+            where('type', '!=', 'SUBSCRIPTION_MASTER')
         )
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -251,7 +251,7 @@ const useWalletStore = create((set, get) => ({
 
     subscribeBudgets: (ledgerId) => {
         get().unsubscribeBudgets?.()
-        const q = query(collection(db, 'budgets'), where('ledgerId', '==', ledgerId))
+        const q = query(collection(db, 'budgets'), where('uid', '==', get().user?.uid))
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const budgets = []
@@ -264,7 +264,7 @@ const useWalletStore = create((set, get) => ({
 
     subscribeGoals: (ledgerId) => {
         get().unsubscribeGoals?.()
-        const q = query(collection(db, 'goals'), where('ledgerId', '==', ledgerId))
+        const q = query(collection(db, 'goals'), where('uid', '==', get().user?.uid))
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const goals = []
@@ -277,7 +277,7 @@ const useWalletStore = create((set, get) => ({
 
     subscribeSubscriptions: (ledgerId) => {
         get().unsubscribeSubscriptions?.()
-        const q = query(collection(db, 'subscriptions'), where('ledgerId', '==', ledgerId))
+        const q = query(collection(db, 'subscriptions'), where('uid', '==', get().user?.uid))
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const subs = []
@@ -739,6 +739,7 @@ const useWalletStore = create((set, get) => ({
         if (!get().ledgerId) return
         try {
             await addDoc(collection(db, 'wallets'), {
+                uid: get().user?.uid, // Enforce UID
                 ledgerId: get().ledgerId,
                 name,
                 type,

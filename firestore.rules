@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated and is the owner
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Common rule for user-owned collections
+    // Allow read/write ONLY if the document's 'uid' field matches the requesting user's UID
+    // OR if creating a new document, the 'uid' field must match the requesting user's UID
+    match /{collection}/{document=**} {
+      allow read, update, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+    }
+    
+    // Specific overrides if needed (e.g. for shared ledgers later, but strict for now)
+    // Users Profile
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+  }
+}

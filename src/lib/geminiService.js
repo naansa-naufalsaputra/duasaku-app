@@ -118,6 +118,18 @@ export const scanReceipt = async (base64Image) => {
 
     const cleanBase64 = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
+    const systemInstruction = `
+    Analyze this receipt image. Extract these fields into a strict JSON format only:
+    
+    total: (Number, clean without currency symbols)
+    date: (String, YYYY-MM-DD format, or today's date if missing)
+    items: (Array of strings, list of main items purchased)
+    merchant: (String, store name)
+    category: (String, guess one: 'Makanan', 'Transport', 'Belanja', 'Tagihan', 'Lainnya')
+    
+    RETURN ONLY RAW JSON. NO MARKDOWN. NO \`\`\`json TAGS.
+    `;
+
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -125,7 +137,7 @@ export const scanReceipt = async (base64Image) => {
             body: JSON.stringify({
                 contents: [{
                     parts: [
-                        { text: "Extract JSON only: { title, amount, category, date }" },
+                        { text: systemInstruction },
                         { inline_data: { mime_type: "image/jpeg", data: cleanBase64 } }
                     ]
                 }]
@@ -138,11 +150,23 @@ export const scanReceipt = async (base64Image) => {
         }
 
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error("No text returned");
+        if (!text) throw new Error("No text returned by AI");
 
-        return JSON.parse(text.replace(/```json|```/g, "").trim());
+        // CLEAN & PARSE
+        const cleanJson = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+
+        // Map to app format
+        return {
+            amount: parsed.total || 0,
+            title: parsed.merchant ? `${parsed.merchant} (${parsed.items?.[0] || 'Items'})` : 'Struk Belanja',
+            category: parsed.category || 'Expense',
+            date: parsed.date || new Date().toISOString()
+        };
+
     } catch (err) {
-        throw new Error(`Scan Gagal (${modelName}): ${err.message}`);
+        console.error("OCR Parse Error:", err);
+        throw new Error(`Gagal membaca struk: ${err.message}`);
     }
 };
 
